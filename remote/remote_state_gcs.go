@@ -82,6 +82,11 @@ func (gcsInitializer GCSInitializer) NeedsInitialization(remoteState *RemoteStat
 		return true, nil
 	}
 
+	// Delete custom AFTER the bucket is created GCS labels that are only used in Terragrunt config and not in Terraform's backend
+	for _, key := range terragruntGCSOnlyConfigs {
+		delete(remoteState.Config, key)
+	}
+
 	return false, nil
 }
 
@@ -107,11 +112,6 @@ func gcsConfigValuesEqual(config map[string]interface{}, existingBackend *Terraf
 				existingBackend.Config[key] = convertedValue
 			}
 		}
-	}
-
-	// Delete custom GCS labels that are only used in Terragrunt config and not in Terraform's backend
-	for _, key := range terragruntGCSOnlyConfigs {
-		delete(config, key)
 	}
 
 	if !terraformStateConfigEqual(existingBackend.Config, config) {
@@ -217,7 +217,6 @@ func createGCSBucketIfNecessary(gcsClient *storage.Client, config *ExtendedRemot
 	if !DoesGCSBucketExist(gcsClient, &config.remoteStateConfigGCS) {
 		terragruntOptions.Logger.Printf("Remote state GCS bucket %s does not exist. Attempting to create it", config.remoteStateConfigGCS.Bucket)
 
-		terragruntOptions.Logger.Printf("%v", config.Project)
 		// A project must be specified in order for terragrunt to automatically create a storage bucket.
 		if config.Project == "" {
 			return errors.WithStackTrace(MissingRequiredGCSRemoteStateConfig("project"))
